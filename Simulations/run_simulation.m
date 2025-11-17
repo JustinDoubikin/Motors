@@ -31,7 +31,10 @@ function run_simulation(config_file)
     % Run config file to load parameters
     run(config_file);
     
-    fprintf('Starting simulation...\n');
+    % Clear persistent variables in controller
+    clear simple_pi_control;
+    
+    fprintf('Starting simulation... \n');
     fprintf('Motor Type: %s\n', config.motor_type);
     fprintf('Control Method: %s\n', config.control_method);
     fprintf('Simulation Time: %.2f seconds\n', config.sim_time);
@@ -63,7 +66,7 @@ function run_simulation(config_file)
         error = reference(i-1) - results.speed(i-1);
         
         % Call controller (placeholder - will be replaced with actual controller)
-        results.voltage(i-1) = simple_pi_control(error, config.controller);
+        results.voltage(i-1) = simple_pi_control(error, config.controller, config.time_step);
         
         % Update motor state (placeholder - will be replaced with actual motor model)
         [results.speed(i), results.current(i), results.torque(i), results.position(i)] = ...
@@ -94,21 +97,34 @@ function ref = generate_reference(t, config)
         case 'ramp'
             ref = config.reference.amplitude * t / max(t);
         case 'sine'
-            ref = config.reference.amplitude * sin(2*pi*t);
+            % Use specified frequency if present, otherwise default to 1 Hz
+            if isfield(config.reference, 'frequency') && ~isempty(config.reference.frequency)
+            f = config.reference.frequency;
+            else
+            f = 1; % default frequency (Hz)
+            end
+            ref = config.reference.amplitude * sin(2*pi*f.*t);
         otherwise
             ref = zeros(size(t));
     end
 end
 
-function voltage = simple_pi_control(error, controller)
-    % Simple PI controller (placeholder)
-    % In actual implementation, this will be replaced with proper controller
+function voltage = simple_pi_control(error, controller, dt)
+    % Simple PI controller with proper integral scaling
+    % Inputs:
+    %   error - Control error (reference - actual)
+    %   controller - Struct with Kp, Ki, output_limit
+    %   dt - Time step for integral calculation
+    % Output:
+    %   voltage - Control signal with saturation
+    
     persistent integral;
     if isempty(integral)
         integral = 0;
     end
     
-    integral = integral + error;
+    % Proper discrete integral with dt scaling
+    integral = integral + error * dt;
     voltage = controller.Kp * error + controller.Ki * integral;
     
     % Saturation
@@ -116,13 +132,47 @@ function voltage = simple_pi_control(error, controller)
 end
 
 function [speed, current, torque, position] = update_motor_state(speed_prev, current_prev, voltage, config, dt)
-    % Simple DC motor model (placeholder)
-    % In actual implementation, this will call appropriate motor model
+    % Enhanced DC motor model with current saturation and nonlinear friction
+    % Inputs:
+    %   speed_prev, current_prev - Previous states
+    %   voltage - Applied voltage
+    %   config - Configuration struct
+    %   dt - Time step
+    % Outputs:
+    %   speed, current, torque, position - Updated states
     
-    % Simple first-order approximations
+    % Electrical dynamics: di/dt = (V - Ke*omega - Ra*i) / La
     current = current_prev + (voltage - config.motor.Ke * speed_prev - config.motor.Ra * current_prev) * dt / config.motor.La;
-    torque = config.motor.Kt * current - config.load.torque;
-    speed = speed_prev + (torque - config.motor.b * speed_prev) * dt / config.motor.J;
+    
+    % Current saturation (if defined in config)
+    if isfield(config.motor, 'I_max')
+        current = max(min(current, config.motor.I_max), -config.motor.I_max);
+    end
+    
+    % Electromagnetic torque
+    torque_em = config.motor.Kt * current;
+    
+    % Nonlinear friction: viscous (b*omega) + Coulomb (constant, direction-dependent)
+    friction_viscous = config.motor.b * speed_prev;
+    
+    if isfield(config.motor, 'Tc')
+        % Coulomb friction (opposes motion)
+        if abs(speed_prev) > 1e-3  % Threshold to avoid chattering at zero speed
+            friction_coulomb = config.motor.Tc * sign(speed_prev);
+        else
+            friction_coulomb = 0;
+        end
+    else
+        friction_coulomb = 0;
+    end
+    
+    % Net torque
+    torque = torque_em - friction_viscous - friction_coulomb - config.load.torque;
+    
+    % Mechanical dynamics: domega/dt = torque_net / J
+    speed = speed_prev + torque * dt / config.motor.J;
+    
+    % Position integration (simple forward Euler)
     position = 0;  % Not implemented in this simple example
 end
 

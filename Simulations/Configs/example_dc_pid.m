@@ -33,9 +33,10 @@ config.load.step_torque = 0.02; % Load torque after step
 config.load.step_time = 5;
 
 %% Reference Signal (Speed control)
-config.reference.type = 'step';
-config.reference.amplitude = 200;  % 200 rad/s target speed
-config.reference.step_time = 1;
+config.reference.type = 'sine';
+config.reference.amplitude = 150;  % 200 rad/s target speed
+config.reference.step_time = 0.5;    % Time to start sine wave
+config.reference.frequency = 0.2;    % Frequency of sine wave (Hz)
 
 %% Initial Conditions
 config.initial.speed = 0;
@@ -52,5 +53,5 @@ config.output.filename_prefix = 'dc_pid_';
 config.plot.speed = true;
 config.plot.current = true;
 config.plot.torque = true;
-config.plot.position = false;
+config.plot.position = true;
 config.plot.voltage = true;
