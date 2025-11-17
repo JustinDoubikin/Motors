@@ -50,7 +50,9 @@ config.controller.integral_limit = 5.0;  % Anti-windup limit
 
 %% Current Limiting (for motor protection)
 config.current_limit.enabled = true;
-config.current_limit.max_current = motor_params.current_max;  % Maximum allowed current (A)
+config.current_limit.max_current = motor_params.current_max;     % Continuous current limit (A)
+config.current_limit.peak_current = motor_params.current_peak;   % Peak current limit (A)
+config.current_limit.peak_duration = 2.0;    % Maximum duration for peak current (s)
 config.current_limit.action = 'reduce_voltage';  % Action when limit exceeded
 
 %% Load Parameters
@@ -100,13 +102,18 @@ config.metrics.rise_time = true;         % Calculate rise time
 %% Display Configuration Summary
 fprintf('\n=== Configuration Summary ===\n');
 fprintf('Motor: %s\n', motor_params.name);
-fprintf('Rated Speed: %.0f RPM\n', motor_params.speed_rated_rpm);
-fprintf('Target Speed: %.0f RPM (%.1f%% of rated)\n', ...
+fprintf('Gear Ratio: %d:1\n', motor_params.gear_ratio);
+fprintf('No-load Speed: %.0f RPM\n', motor_params.speed_rated_rpm);
+fprintf('Target Speed: %.0f RPM (%.1f%% of no-load)\n', ...
         config.reference.amplitude*60/(2*pi), ...
         config.reference.amplitude/motor_params.speed_rated*100);
 fprintf('Encoder Resolution: %d CPR\n', config.encoder.cpr);
+fprintf('Driver: %s\n', motor_params.driver.name);
+fprintf('Driver Mode: %s\n', motor_params.driver.mode);
 fprintf('PID Gains: Kp=%.2f, Ki=%.2f, Kd=%.4f\n', ...
         config.controller.Kp, config.controller.Ki, config.controller.Kd);
-fprintf('Current Limit: %.2f A\n', config.current_limit.max_current);
+fprintf('Current Limits: %.2fA cont., %.2fA peak (%.1fs)\n', ...
+        config.current_limit.max_current, config.current_limit.peak_current, ...
+        config.current_limit.peak_duration);
 fprintf('Voltage Limit: %.2f V\n', config.controller.output_limit);
 fprintf('=============================\n\n');

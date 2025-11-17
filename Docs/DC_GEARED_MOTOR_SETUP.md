@@ -6,21 +6,34 @@ This guide explains how to set up and use the DC geared motor (350 RPM with enco
 ## Hardware Components
 
 ### Motor
-- **Model**: 12V DC Motor 350RPM with Encoder
+- **Model**: 12V DC Motor 350RPM with Encoder (34:1 Gear Ratio)
 - **Link**: https://core-electronics.com.au/12v-dc-motor-350rpm-w-encoder-12kg-cm.html
 - **Specs**:
   - Voltage: 12V
-  - No-load Speed: 350 RPM
-  - Stall Torque: ~12 kg-cm (1.2 Nm)
-  - Encoder: 334 PPR (1336 CPR with quadrature)
+  - Gear Ratio: 34:1
+  - No-load Speed: 350 RPM @ 12V
+  - No-load Current: 0.23A
+  - Stall Torque: 12 kg-cm (1.2 Nm)
+  - Stall Current: 5.5A
+  - Max Efficiency Point: 2.0 kg-cm @ 285 RPM, 0.65A, 5.0W
+  - Max Power Point: 5.8 kg-cm @ 180 RPM, 1.65A, 9.0W
+  - Encoder: Hall feedback, 374 counts per revolution
+  - Weight: 98g
 
 ### Motor Driver
-- **Model**: Pololu DRV8838 Single Brushed DC Motor Driver
+- **Model**: Toshiba TB67H420FTG Dual/Single Brushed DC Motor Driver
 - **Link**: https://www.pololu.com/product/2999
 - **Specs**:
-  - Voltage Range: 1.8V to 11V
-  - Continuous Current: 1.8A
-  - Peak Current: 2A
+  - Voltage Range: 10V to 47V
+  - Dual Channel Mode:
+    - Continuous Current: 1.7A per channel
+    - Peak Current: 4.5A per channel
+  - Single Channel Mode:
+    - Continuous Current: 3.4A
+    - Peak Current: 9A
+  - Current Chopping: Configurable (default 4.5A dual / 9A single)
+  - Reverse Voltage Protection: Up to 40V
+  - Protection: Under-voltage, over-current, over-temperature, open-load detection
 
 ### Current Sensor
 - **Type**: ±5A Current Sensor with 400mV/A sensitivity
@@ -87,21 +100,26 @@ run_simulation('Configs/example_geared_motor_encoder.m')
 
 **Known (from datasheet)**:
 - ✓ Rated voltage: 12V
-- ✓ No-load speed: 350 RPM
-- ✓ Stall torque: ~1.2 Nm
-- ✓ Encoder PPR: 334
-- ✓ Driver current limit: 1.8A
+- ✓ Gear ratio: 34:1
+- ✓ No-load speed: 350 RPM @ 12V
+- ✓ No-load current: 0.23A
+- ✓ Stall torque: 12 kg-cm (1.2 Nm)
+- ✓ Stall current: 5.5A
+- ✓ Max efficiency point: 2.0 kg-cm @ 285 RPM, 0.65A, 5.0W
+- ✓ Max power point: 5.8 kg-cm @ 180 RPM, 1.65A, 9.0W
+- ✓ Encoder resolution: 374 counts per revolution
+- ✓ Driver current limits: 1.7A cont. (dual) / 3.4A cont. (single)
 - ✓ Current sensor sensitivity: 400mV/A
 
+**Calculated (from known data)**:
+- ⚠ Armature resistance (Ra): ~2.18 Ω (from stall test: V/I_stall)
+- ⚠ Back EMF constant (Ke): ~0.314 V/(rad/s) (from no-load test)
+- ⚠ Torque constant (Kt): ~0.314 Nm/A (equals Ke in SI units)
+
 **Estimated (need system ID)**:
-- ⚠ Armature resistance (Ra): 2.0 Ω
-- ⚠ Armature inductance (La): 0.002 H
-- ⚠ Back EMF constant (Ke): 0.32 V/(rad/s)
-- ⚠ Torque constant (Kt): 0.32 Nm/A
-- ⚠ Inertia (J): 6e-6 kg.m²
-- ⚠ Damping (b): 0.0001 Nm.s/rad
-- ⚠ Gear ratio: 30:1
-- ⚠ No-load current: 0.08 A
+- ⚠ Armature inductance (La): 0.002 H (typical value)
+- ⚠ Inertia (J): 6e-6 kg.m² (estimated from weight/size)
+- ⚠ Damping (b): 0.0001 Nm.s/rad (typical for geared motors)
 
 ## System Identification Process
 
@@ -113,21 +131,23 @@ run_simulation('Configs/example_geared_motor_encoder.m')
 3. Measure steady-state current
 4. Calculate: Ra = V / I
 ```
+**Expected**: Ra ≈ 2.18 Ω (calculated from stall current: 12V / 5.5A)
 
 ### Test 2: Back EMF Constant (Ke)
-**Method**: No-load coast-down
+**Method**: No-load coast-down or no-load measurement
 ```
+Option A - Coast-down:
 1. Spin motor to known speed (use encoder)
 2. Disconnect power, measure back EMF voltage
 3. Calculate: Ke = V_emf / omega
-```
-Or use no-load speed:
-```
+
+Option B - No-load running:
 1. Apply rated voltage (12V)
-2. Measure no-load speed (encoder)
-3. Measure no-load current
+2. Measure no-load speed (encoder): should be ~350 RPM
+3. Measure no-load current: should be ~0.23A
 4. Calculate: Ke = (V - I_nl * Ra) / omega
 ```
+**Expected**: Ke ≈ 0.314 V/(rad/s)
 
 ### Test 3: Inductance (La)
 **Method**: Step voltage response
@@ -158,8 +178,10 @@ Or verify: Kt = Ke (in SI units)
 ```
 1. Rotate motor shaft exactly N full revolutions
 2. Count encoder pulses
-3. Verify: pulses = N * CPR (1336 for this motor)
+3. Verify: pulses = N * 374 (not 1336 as with typical quadrature)
 ```
+**Note**: This encoder provides 374 counts per revolution (from Hall effect sensors),
+not the typical quadrature encoding that gives 4x the base PPR.
 
 ### Test 7: Current Sensor Calibration
 ```
@@ -257,13 +279,16 @@ config.controller.Kd = 0.05;
 ### PWM Generation
 - Typical frequency: 20-25 kHz
 - Match simulation time step to control loop rate
-- Consider dead-time in H-bridge
+- TB67H420FTG has built-in current chopping
+- No dead-time needed (driver handles this)
 
 ### Safety Features
-- Current limiting (configured in simulation)
-- Voltage limiting
+- Current limiting (1.7A continuous in dual mode, 3.4A in single mode)
+- Peak current handling (4.5A dual, 9A single) for short durations
+- Voltage limiting (up to 47V supported by driver)
+- Thermal protection (driver will disable if overheating)
 - Emergency stop
-- Thermal protection
+- Driver has built-in under-voltage, over-current, over-temperature protection
 
 ## Troubleshooting
 
