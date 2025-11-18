@@ -1,0 +1,55 @@
+# MATLAB and Simulation Files
+
+# MATLAB temporary files
+*.asv
+*.m~
+*.autosave
+
+# Simulink autosave files
+*.slxc
+slprj/
+
+# MATLAB build files
+*.mex*
+*.p
+
+# Simulation results (uncomment if you don't want to track results)
+# Simulations/Results/*.mat
+# Simulations/Results/*.png
+# Simulations/Results/*.fig
+
+# Code generation
+codegen/
+
+# MATLAB cache
+*.mldatx
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary directories
+tmp/
+temp/
+*.tmp
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*~
+
+# Python (if using MATLAB-Python interface)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Backup files
+*.bak
+*.backup
